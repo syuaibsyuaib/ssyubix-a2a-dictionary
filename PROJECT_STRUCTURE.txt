@@ -1,0 +1,55 @@
+📁 PROJECT FOLDER STRUCTURE
+===========================
+
+ssyubix-a2a-dictionary/
+│
+├── 📄 README.md                    ✅ Created
+├── 📄 TASKS.md                     ✅ Created
+├── 📄 abstract.md                  (Created when conversation gets long)
+├── 📄 PROJECT_STRUCTURE.txt        ✅ This file
+│
+├── 📁 src/                         (Core implementation)
+│   ├── __init__.py                 (Main module init)
+│   ├── ailang_spec.py             (AILang specification & parser)
+│   ├── compressor.py              (Text → AILang)
+│   ├── decompressor.py            (AILang → Human text)
+│   └── translator.py              (Main API)
+│
+├── 📁 claude_tools/                (Helper scripts for token efficiency)
+│   ├── token_counter.py           (Count tokens)
+│   ├── semantic_analyzer.py       (Analyze compression potential)
+│   ├── benchmark.py               (Performance testing)
+│   └── abstract_generator.py      (Generate abstract.md)
+│
+├── 📁 tests/                       (Unit & integration tests)
+│   ├── __init__.py
+│   ├── test_compressor.py         (Compressor tests)
+│   ├── test_decompressor.py       (Decompressor tests)
+│   ├── test_integration.py        (End-to-end tests)
+│   ├── conftest.py                (Pytest fixtures)
+│   └── test_data/
+│       └── sample_messages.json
+│
+├── 📁 data/                        (Configuration & sample data)
+│   ├── compression_rules.json     (Compression patterns)
+│   ├── symbol_map.json            (AILang symbol definitions)
+│   └── sample_messages.json       (Test data)
+│
+└── 📁 docs/                        (Documentation)
+    ├── ailang_spec.md             (Complete AILang language spec)
+    ├── compression_rules.md       (Detailed compression patterns)
+    ├── api_reference.md           (API documentation)
+    ├── examples.md                (Usage examples)
+    └── deployment.md              (How to deploy/use)
+
+---
+
+SETUP INSTRUCTIONS:
+1. Create folders: src/, claude_tools/, tests/, data/, docs/
+2. Create necessary __init__.py files
+3. Start with Phase 1: AILang Specification (in src/ailang_spec.py)
+
+---
+
+CREATED AT: 2026-07-31
+STATUS: Initial Structure - Awaiting User Confirmation
