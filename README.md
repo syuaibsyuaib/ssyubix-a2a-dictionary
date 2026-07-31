@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Ssyubix A2A Dictionary (AI-to-AI Communication Protocol)
 
 **Project**: Token-Efficient AI Communication Framework  
@@ -135,3 +136,7 @@ ssyubix-a2a-dictionary/
 - [ ] AILANG_DRAFT.md - Needs minification rules section
 - [ ] PROJECT_CHARTER.md - Needs use-case clarification
 - [ ] TASKS.md - Needs updated blockers
+=======
+# ssyubix-a2a-dictionary
+AI Agen Dictionary for efficiency token
+>>>>>>> 6ad99d4a43a56fe48b60f1d17dde9c2fe2695d97
