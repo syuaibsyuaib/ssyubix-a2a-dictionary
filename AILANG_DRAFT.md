@@ -87,6 +87,8 @@ from the database and include their recent activity logs?"
 AILANG:
 {act: retrieve | data: {obj: user.profile, inc: activity_logs}}
 ```
+**Tokens**: 20
+**Characters**: 63
 **Savings**: 60% tokens
 
 ### Pattern B: Coordinate Delta
@@ -279,4 +281,3 @@ EFFICIENCY: Original 24 tokens → Compressed 15 tokens (38% savings)
 3. Should we add namespace support for domain-specific keywords?
 4. Context window size assumptions? (assume Claude 100K+)
 5. Any security/safety concerns with this approach?
-
