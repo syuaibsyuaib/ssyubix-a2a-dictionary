@@ -51,21 +51,45 @@ Use Case B (with reasoning):
 
 **Design Decision**: AILang targets API-call efficiency, defer reasoning optimization
 
-### 3. Recommended Hybrid Strategy
-- **Transmission**: Ultra-minified AILang (max efficiency)
-- **Storage**: Formatted JSON (human-readable audit)
-- **Display**: Natural language (translator output)
+### 3. Arsitektur: Opaque-by-Design (REVISI 2026-08-20)
+
+Wire format A2A dioptimasi **murni untuk efisiensi token** dan **tidak wajib
+dapat dibaca manusia**. Log menyimpan wire format **verbatim**. Keterbacaan
+dipindahkan sepenuhnya ke **Translator Agent** yang membaca log sebagai MITM.
+
+- **Transmission**: wire format token-optimal (tidak wajib terbaca manusia)
+- **Log**: verbatim, persis seperti dikirim — *tanpa* lapis konversi
+- **Translator Agent**: natural language, **on-demand** saja
 
 **Example Flow:**
 ```
 A2A Transmission: {ctx:task|ref:prev_5|act:compute|data:{x:1}}
-                  ↓ (decompressor)
-Audit Format:     { "context": "task", "reference": "previous_5", ... }
-                  ↓ (translator)
-Human View:       "Execute task based on previous message with x=1"
+                  |
+                  +--> Log (verbatim, apa adanya)
+                            |
+                            +--> Translator Agent  [on-demand, di samping jalur]
+                                 "Execute task based on previous message with x=1"
 ```
 
-**Benefit**: Efficiency + Auditability + Readability (all three!)
+**Perubahan**: lapis "Storage: Formatted JSON" **dihapus** — log tidak lagi
+menyimpan hasil konversi. Satu lapis konversi hilang dari desain.
+
+**Asumsi kerja** (belum diverifikasi angka, lihat `CRITICAL_FINDINGS.md`):
+- **ASM-1**: translasi **on-demand**, bukan tiap pesan
+- **ASM-2**: translator **di samping jalur**, bukan relay di jalur kirim
+
+### 4. ⚠️ Biaya Token ≠ Jumlah Karakter (temuan baru)
+
+Data ukur sendiri di `data/token_measurements.csv`:
+
+| Pattern | Karakter | Token |
+|---|---|---|
+| A (tanpa simbol Unicode) | 63 | **20** |
+| B (pakai `Δ`, `°`) | 36 | **23** |
+
+Pattern B **43% lebih pendek** secara karakter tapi **lebih mahal** tokennya.
+Memampatkan ke simbol eksotis justru **menaikkan** biaya. Target optimasi yang
+benar adalah **token berfrekuensi tinggi**, bukan string terpendek.
 
 ---
 
@@ -119,19 +143,21 @@ ssyubix-a2a-dictionary/
 
 ## Next Steps
 
-### ⚠️ CRITICAL: User Review Required
-1. **Whitespace Strategy**: Approve ultra-minified AILang format (zero spaces)?
-2. **Use Case Focus**: Confirm AILang targets API-call efficiency (not reasoning)?
-3. **Hybrid Approach**: Accept transmission (minified) + storage (formatted) + display (natural)?
+### Status Checkpoint (per 2026-08-20)
+1. **Whitespace Strategy** — ✅ DISETUJUI (ultra-minified)
+2. **Use Case Focus** — ⏳ **MASIH TERBUKA**, satu-satunya checkpoint pemblokir
+3. **Hybrid Approach** — ✅ DISETUJUI DENGAN REVISI (2 lapis, bukan 3)
 
-### If Approved:
-1. Update AILANG_DRAFT.md with minification rules
-2. Update PROJECT_CHARTER.md with use-case clarification
-3. Begin Phase 1 specification refinement
-4. Prototype minified compression algorithm
+### Prioritas Berikutnya
+1. Lengkapi kolom `natural_tokens` di `data/token_measurements.csv`
+   (8 baris; saat ini kosong semua → belum ada efisiensi yang terhitung)
+2. Verifikasi dugaan Pattern B justru MEMPERBESAR pesan
+3. Uji arah **codebook**: konsep → satu token berfrekuensi tinggi
+4. Jawab checkpoint #2 + OPEN-Q1 (translator deterministik atau agen LLM?)
 
 ### Documentation Updated
-- [x] README.md - Critical findings added
-- [ ] AILANG_DRAFT.md - Needs minification rules section
-- [ ] PROJECT_CHARTER.md - Needs use-case clarification
-- [ ] TASKS.md - Needs updated blockers
+- [x] README.md - Arsitektur opaque-by-design + temuan token vs karakter
+- [x] CRITICAL_FINDINGS.md - Keputusan desain, ASM-1/ASM-2, RISK-T1, OPEN-Q1
+- [x] TASKS.md - Blocker #1 resolved, asumsi baru, status usang dikoreksi
+- [ ] AILANG_DRAFT.md - Klaim "Savings" §3 perlu diukur ulang
+- [ ] PROJECT_CHARTER.md - Janji >99% accuracy perlu ditinjau (lihat OPEN-Q1)

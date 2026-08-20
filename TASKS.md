@@ -1,16 +1,19 @@
 # Project Tasks - Ssyubix A2A Dictionary
 
-**Last Updated**: 2026-07-31  
-**Active Phases**: Project Formation
+**Last Updated**: 2026-08-20  
+**Active Phases**: Phase 1 (Definition) — arsitektur direvisi ke opaque-by-design
 
 ## 🎯 Phase 1: Definition & Specification (IN PROGRESS)
 
 ### Critical Path
-- [ ] **[P0]** Penyamaan persepsi dengan user
-  - Confirm project scope
-  - Define success metrics
-  - Agree on timeline
-  - Status: AWAITING CONFIRMATION
+- [~] **[P0]** Penyamaan persepsi dengan user
+  - [x] Arah arsitektur: A2A **opaque-by-design** (wire format tidak wajib
+        terbaca manusia; log verbatim; Translator Agent sebagai MITM pembaca)
+  - [x] Checkpoint #1 (ultra-minified) — DISETUJUI
+  - [x] Checkpoint #3 (hybrid) — DISETUJUI DENGAN REVISI: 2 lapis, bukan 3
+  - [ ] Checkpoint #2 (fokus API-call vs reasoning) — **MASIH TERBUKA**
+  - [ ] Confirm project scope / success metrics / timeline
+  - Status: SEBAGIAN DIKONFIRMASI (detail: CRITICAL_FINDINGS.md)
 
 - [ ] **[P0]** AILang Specification v0.1
   - Define core syntax & semantics
@@ -32,7 +35,10 @@
 
 ### Research & Planning
 - [ ] Literature review on existing AI communication protocols
-- [ ] Benchmark current Claude → Claude communication efficiency
+- [~] Benchmark current Claude → Claude communication efficiency
+  - `data/token_measurements.csv` dibuat; 5/8 baris sisi compressed terukur
+  - **BLOKER**: kolom `natural_tokens` masih kosong di SEMUA baris, jadi
+    belum ada satu pun `efficiency_pct` yang benar-benar terhitung
 - [ ] Document edge cases & failure modes
 - [ ] Identify technical constraints (context window, model limitations)
 
@@ -97,11 +103,19 @@
 
 ## 🔧 Infrastructure & Support
 
-- [ ] Setup project folder structure ✅
-- [ ] Create TASKS.md ✅
+- [x] Setup project folder structure
+- [x] Create TASKS.md
 - [ ] Create abstract.md (when needed)
-- [ ] Setup claude_tools/ utilities
+- [x] Setup claude_tools/ utilities
+  - `claude_tools/token_counter.py` (wrapper endpoint resmi count_tokens)
+  - `tests/test_token_counter.py` — 9 test, semua lulus (verified 2026-08-20)
 - [ ] Configure pytest & testing framework
+  - ⚠️ **Divergensi**: test yang ada pakai `unittest`, bukan `pytest`,
+    padahal README §Tech Stack, Charter D4, Charter App.B, dan
+    PROJECT_STRUCTURE.txt (`conftest.py`) semua menyebut pytest.
+    Perlu keputusan: migrasi test ke pytest, ATAU turunkan dokumen ke unittest.
+- [ ] Tambah `requirements.txt` — `anthropic` sudah jadi dependency riil
+- [ ] Tambah `.gitignore` — `__pycache__/*.pyc` saat ini ikut ter-commit
 - [ ] Setup CI/CD (if needed)
 
 ---
@@ -109,20 +123,42 @@
 ## ❓ Blockers & Questions (RESOLVED WHEN CONFIRMED)
 
 ### Critical Findings (2026-07-31)
-1. **Whitespace Consumption**: Spaces, tabs, newlines all consume tokens
-   - Question: Should AILang be ULTRA-MINIFIED (zero spaces) for max efficiency?
-   - Implication: Drops 50% more tokens vs minified JSON
-   - Trade-off: Less human-readable (solved by translator)
+1. ~~**Whitespace Consumption**~~ — **RESOLVED 2026-08-20**: ultra-minified
+   disetujui (wire format tidak wajib terbaca manusia).
+   - ⚠️ **KOREKSI penting atas asumsi lama**: klaim "drops 50% more tokens"
+     tidak berlaku umum. Data ukur sendiri membantahnya untuk simbol Unicode:
+     Pattern A = 63 karakter/**20 token**, Pattern B = 36 karakter/**23 token**.
+     Pattern B 43% lebih pendek tapi LEBIH MAHAL. Memperpendek string tidak
+     otomatis memurahkan token — lihat Temuan #4 di CRITICAL_FINDINGS.md.
 
 2. **Extended Thinking Cost**: Reasoning tokens expensive ($15/M, same as output)
    - Finding: Reasoning tasks negate AILang savings
    - Question: Should AILang focus on API-call efficiency only?
    - Implication: Defer reasoning optimization to v0.2
 
-3. **Use Case Clarification**: What's the PRIMARY use case?
+3. **Use Case Clarification**: What's the PRIMARY use case?  ← **MASIH TERBUKA**
    - Option A: Quick API calls (queries, retrieval) → AILang PERFECT ✅
    - Option B: Complex reasoning (decision-making) → AILang LIMITED ❌
    - Option C: Mixed (both) → Need hybrid strategy ⚠️
+
+### Asumsi Arsitektur Baru (2026-08-20, menunggu konfirmasi)
+- **ASM-1** — Frekuensi translasi **on-demand**, bukan tiap pesan.
+  - RISK-T1: kalau ~100% pesan diterjemahkan, biaya Translator Agent
+    (input log + output natural language) bisa membuat sistem **net negatif**.
+    Pola kesalahannya sama dengan temuan extended thinking.
+- **ASM-2** — Translator **di samping jalur** (baca log asinkron), bukan relay.
+  - Konsekuensi: biaya & latensi translator = nol di jalur utama A2A.
+- **OPEN-Q1** — Translator deterministik (kamus) atau agen LLM?
+  - Charter §7 menjanjikan rekonstruksi >99%. Agen LLM tidak bisa menjamin
+    angka itu secara deterministik → charter perlu revisi, atau perlu
+    lapisan verifikasi.
+
+### Arah Desain Baru yang Perlu Diuji
+- [ ] **Codebook**: petakan tiap konsep ke **satu token berfrekuensi tinggi**
+      di vocabulary model (bukan simbol Unicode, bukan singkatan).
+      Ini arah yang paling diuntungkan oleh keputusan opaque-by-design.
+- [ ] Ukur ulang seluruh Pattern A-E dengan sisi natural ikut terukur
+- [ ] Verifikasi dugaan Pattern B justru MEMPERBESAR pesan (~13-14 → 23 token)
 
 ### Original Blockers
 1. What is the target token efficiency improvement? (updated: 60-70% for API calls)
