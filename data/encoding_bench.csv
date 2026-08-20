@@ -1,0 +1,14 @@
+scheme_id,family,text,semantic_bits,semantic_capacity,characters,utf8_bytes,non_ascii_chars,bits_per_char,bits_per_byte,tokens,bits_per_token,pct_of_ceiling,tokenizer_source,measured_date,note
+natural_full,natural,Can you please retrieve the user's profile information from the database and include their recent activity logs?,24,16777216,112,112,0,0.214,0.214,,,,BELUM DIUKUR (analisis struktural saja),2026-08-20,baseline: bahasa natural lengkap
+natural_terse,natural,retrieve user profile with activity logs,24,16777216,40,40,0,0.6,0.6,,,,BELUM DIUKUR (analisis struktural saja),2026-08-20,"bahasa natural dipadatkan, masih transparan"
+json_min,json,"{""act"":""retrieve"",""obj"":""user.profile"",""inc"":""activity_logs""}",24,16777216,61,61,0,0.393,0.393,,,,BELUM DIUKUR (analisis struktural saja),2026-08-20,"JSON minified, key pendek"
+json_min_numeric,json,"{""a"":17,""o"":42,""m"":7}",24,16777216,21,21,0,1.143,1.143,,,,BELUM DIUKUR (analisis struktural saja),2026-08-20,JSON minified dengan ID numerik
+ailang_v01_spaced,ailang,"{act: retrieve | data: {obj: user.profile, inc: activity_logs}}",24,16777216,63,63,0,0.381,0.381,,,,BELUM DIUKUR (analisis struktural saja),2026-08-20,AILang v0.1 persis seperti di AILANG_DRAFT.md (ada spasi)
+ailang_min,ailang,"{act:retrieve|data:{obj:user.profile,inc:activity_logs}}",24,16777216,56,56,0,0.429,0.429,,,,BELUM DIUKUR (analisis struktural saja),2026-08-20,AILang zero-whitespace (checkpoint #1)
+ailang_unicode,ailang,{act:retrieve|obj:user.profile∧inc:activity_logs◆Δ:∅},24,16777216,53,60,4,0.453,0.4,,,,BELUM DIUKUR (analisis struktural saja),2026-08-20,AILang pakai simbol Unicode -- menguji hipotesis simbol mahal
+binary_fixed,fixed_width,000100010010101000000111,24,16777216,24,24,0,1.0,1.0,,,,BELUM DIUKUR (analisis struktural saja),2026-08-20,"IDE USER: pola biner, panjang tetap 24 char"
+hex_fixed,fixed_width,112A07,24,16777216,6,6,0,4.0,4.0,,,,BELUM DIUKUR (analisis struktural saja),2026-08-20,"basis 16, panjang tetap"
+base36_fixed,fixed_width,0o3yf,24,16777216,5,5,0,4.8,4.8,,,,BELUM DIUKUR (analisis struktural saja),2026-08-20,"basis 36, panjang tetap"
+base64_fixed,fixed_width,ESoH,24,16777216,4,4,0,6.0,6.0,,,,BELUM DIUKUR (analisis struktural saja),2026-08-20,"basis 64, panjang tetap"
+codebook_word_space,codebook,new old make,24,16777216,12,12,0,2.0,2.0,,,,BELUM DIUKUR (analisis struktural saja),2026-08-20,codebook kata dipisah spasi -- 1 token per konsep (target)
+codebook_word_pipe,codebook,new|old|make,24,16777216,12,12,0,2.0,2.0,,,,BELUM DIUKUR (analisis struktural saja),2026-08-20,codebook kata dipisah pipe (tanpa spasi)
