@@ -15,9 +15,34 @@
   - [ ] Confirm project scope / success metrics / timeline
   - Status: SEBAGIAN DIKONFIRMASI (detail: CRITICAL_FINDINGS.md)
 
+- [ ] **[P0]** Pangkas envelope + spesifikasi handshake  ← PRIORITAS TERTINGGI
+  - Envelope §5 = 3,4x payload; tanpa dipangkas, target >=60% MUSTAHIL
+    (TEMUAN #5, hukum Amdahl)
+  - [ ] Tetapkan field mana yang keluar dari tiap pesan (telemetri -> log,
+        konstanta -> handshake)
+  - [ ] Spesifikasi handshake: codebook_id+versi, skema posisi, session_id,
+        model/tokenizer target
+  - [ ] Aturan fallback bila tidak ada codebook yang sama-sama dimiliki
+  - [ ] Verifikasi codebook_id di muka (mitigasi RISK-T2)
+  - [ ] Pelajari HPACK (HTTP/2) — prior art, terutama desinkronisasi tabel
+  - Status: TODO — tidak butuh riset, murni keputusan desain
+
+- [ ] **[P0]** Format log ber-sesi (konsekuensi pangkas envelope)
+  - Entri log tidak lagi berdiri sendiri; handshake jadi header sesi
+  - [ ] Translator harus baca header sebelum dekode pesan mana pun
+  - [ ] Retensi: header WAJIB hidup selama pesannya masih ada
+  - Status: TODO
+
+- [ ] **[P0]** Bangun codebook transparan posisi-tetap
+  - [ ] Jalankan `encoding_bench.py validate-codebook` (butuh kredensial)
+  - [ ] Kurasi entri yang TEPAT 1 token pada model target
+  - [ ] Beri versi; codebook terikat versi tokenizer
+  - Status: BLOCKED — butuh ANTHROPIC_API_KEY
+
 - [ ] **[P0]** AILang Specification v0.1
   - Define core syntax & semantics
-  - Document symbol system (→, ↔, ∴, etc)
+  - ~~Document symbol system (→, ↔, ∴, etc)~~ — **DIBATALKAN**: simbol Unicode
+    menaikkan biaya token (TEMUAN #4). §2.2 draft perlu DIBUANG, bukan direvisi
   - JSON/struct format examples
   - Status: TODO
 

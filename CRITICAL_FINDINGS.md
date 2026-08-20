@@ -2,6 +2,8 @@
 
 **Date**: 2026-07-31 (dibuat) / 2026-08-20 (revisi arsitektur)  
 **Status**: CHECKPOINT #1 & #3 DIPUTUSKAN — #2 MASIH TERBUKA  
+**Keputusan arsitektur aktif**: opaque-by-design · pangkas envelope + handshake wajib  
+**Risiko terbuka**: RISK-T1 (biaya translator) · RISK-T2 (korupsi diam-diam)  
 **Updated Files**: README.md, TASKS.md, AILANG_DRAFT.md
 
 ---
@@ -111,6 +113,149 @@ Belum diputuskan, dan ini punya konsekuensi ke janji akurasi di charter.
 `PROJECT_CHARTER.md` §7 menjanjikan rekonstruksi **>99% accuracy**. Agen LLM
 tidak bisa menjamin angka itu secara deterministik. Kalau translator berupa
 agen LLM, janji di charter perlu direvisi atau perlu lapisan verifikasi.
+
+---
+
+## 🔥 TEMUAN #5: ENVELOPE MENDOMINASI PAYLOAD (2026-08-20)
+
+Envelope di `AILANG_DRAFT.md` §5 berukuran **3,4x lebih besar** dari payload
+yang dibungkusnya. Selama ini seluruh usaha optimasi diarahkan ke payload --
+bagian yang justru paling kecil.
+
+```
+envelope §5 (v, sender, receiver, msg_id, prev_id,
+             ts, encoding, orig_tokens, ailang_tokens,
+             efficiency)                          212 char  ~53 token
+payload AILang                                     63 char  ~16 token
+payload codebook                                   12 char   ~3 token
+```
+
+Dampaknya ke total biaya per pesan:
+
+| Skenario | ~token/pesan | Hemat |
+|---|---|---|
+| AILang v0.1 + envelope penuh | 69 | — |
+| Codebook + envelope penuh | 56 | **19%** |
+| Codebook + envelope dipangkas | 7 | **90%** |
+
+**Ini hukum Amdahl.** Memampatkan payload 81% (16 -> 3 token) hanya
+menghasilkan 19% secara total, karena 77% biaya ada di envelope yang tidak
+disentuh. Target >=60% di charter TIDAK MUNGKIN tercapai tanpa memangkas
+envelope, seberapa pun bagus encoding payload-nya.
+
+> Angka di atas estimasi char/4, BELUM diukur `count_tokens` resmi.
+> Yang penting rasionya (3,4x), bukan digit persisnya.
+
+Field yang bisa keluar dari tiap pesan:
+- `orig_tokens`, `ailang_tokens`, `efficiency` -- telemetri, tempatnya di log
+- `encoding`, `v` -- konstan, sepakati sekali di handshake
+- `sender`, `receiver` -- implisit dari channel/sesi
+- Sisakan `msg_id` + `prev_id` ringkas + payload
+
+---
+
+## 🔒 KEPUTUSAN DESAIN: PANGKAS ENVELOPE + HANDSHAKE WAJIB (2026-08-20)
+
+**Sumber**: usulan Claude (pangkas envelope), disempurnakan owner (handshake)
+**Status**: DITETAPKAN
+
+Envelope dipangkas dengan memindahkan field konstan ke **state tingkat sesi**,
+yang disepakati lewat **handshake** sebelum pesan pertama.
+
+### Handshake bukan biaya tambahan -- dia PRASYARAT KEAMANAN
+
+Lihat RISK-T2. Tanpa handshake, pemangkasan envelope memindahkan risiko dari
+"boros token" ke "salah tafsir tanpa ketahuan" -- pertukaran yang buruk.
+
+### Titik impas
+
+`N > H / penghematan_per_pesan`, dengan penghematan ~53 token/pesan:
+
+| Isi handshake | H (token) | Impas di N pesan |
+|---|---|---|
+| Referensi codebook saja (id + versi + skema) | 30 | **1** |
+| + negosiasi kemampuan singkat | 80 | **2** |
+| Kirim codebook 256 entri inline | 700 | 13 |
+| Kirim codebook 4096 entri inline | 11.000 | 208 |
+
+**ATURAN: jangan kirim codebook-nya, kirim rujukannya.** Codebook di-share
+di luar jalur (versioned, di system prompt), handshake cuma menyebut
+`codebook: v3`. Selisihnya 30 token versus 11.000.
+
+Bonus: codebook yang tinggal di system prompt kena **prompt caching** --
+konten stabil di posisi paling depan, dibayar sekali lalu jadi cache read
+untuk semua panggilan berikutnya.
+
+### Isi handshake (semua konstan sepanjang sesi)
+
+- `codebook_id` + versi -- PALING KRITIS, sumber RISK-T2
+- Skema posisi (slot 1 = action, slot 2 = object, dst.)
+- Versi protokol + id encoding
+- Identitas kedua agen
+- `session_id` -- supaya `msg_id` cukup jadi nomor urut pendek
+- **Model/tokenizer target** -- properti "1 token" tervalidasi PER MODEL;
+  kalau lawan bicara pakai model lain, arti tetap benar tapi kepadatan
+  diam-diam merosot
+
+### Aturan turunan
+
+1. **Handshake tidak boleh dikompresi oleh codebook yang dinegosiasikannya**
+   (ayam-telur). Handshake polos dan verbose. Hanya sekali, jadi tidak apa-apa.
+2. **Wajib ada fallback**: kalau tidak ada codebook yang sama-sama dimiliki,
+   turun ke bahasa natural -- jangan gagal. Degradasi bertahap.
+3. **Codebook transparan, bukan arbitrer.** Keduanya berbiaya SAMA (1 token
+   per konsep), jadi arbitrer tidak memberi keuntungan kepadatan sedikit pun
+   -- hanya memperbesar ruang alamat yang sudah berlebih. Tapi arbitrer
+   menambah dua biaya nyata: codebook harus masuk context penerima DAN
+   translator, plus risiko akurasi karena model harus melakukan indireksi.
+   Keuntungan nol, kerugian nyata -> transparan menang.
+
+### Prior art
+
+Ini pada dasarnya **HPACK** (kompresi header HTTP/2): tabel statis disepakati
+di muka + tabel dinamis per-koneksi + representasi terindeks. Masalahnya
+identik -- header berulang mendominasi payload kecil -- dan solusinya sudah
+teruji di produksi. Baca terutama bagian penanganan desinkronisasi tabel
+sebelum merancang dari nol.
+
+---
+
+## RISK-T2: KORUPSI DIAM-DIAM AKIBAT CODEBOOK TIDAK COCOK ⚠️
+
+**Severity: TINGGI.** Ini risiko terparah dalam desain, karena tidak terlihat.
+
+Begitu envelope dipangkas, pesan tidak lagi membawa keterangan codebook mana
+yang dipakai. Kalau Agent A memakai codebook v3 dan Agent B masih v2:
+
+```
+Agent A kirim:  get user log      (codebook v3)
+Agent B dekode: get user log      (codebook v2) -> ARTI BERBEDA
+```
+
+Pesan **terdekode dengan sukses**. Tidak ada error, tidak ada exception,
+tidak ada yang gagal. Hanya agen yang mengerjakan hal salah dengan penuh
+keyakinan. Ini lebih berbahaya daripada crash -- crash setidaknya terlihat.
+
+**Mitigasi**: handshake WAJIB memverifikasi `codebook_id` + versi sebelum
+pesan pertama. Ketidakcocokan ditolak di muka, bukan ditemukan belakangan.
+
+---
+
+## KONSEKUENSI: FORMAT LOG BERUBAH (dampak ke ASM-1 / ASM-2)
+
+Pemangkasan envelope mengubah sifat log secara mendasar. Entri log **tidak
+lagi berdiri sendiri**: `get user log` tanpa konteks sesi tidak bermakna
+apa pun.
+
+Akibatnya:
+
+1. **Handshake wajib jadi header di log.** Translator harus membacanya
+   sebelum bisa mendekode satu pesan pun di sesi itu.
+2. **Log berubah dari kumpulan entri independen jadi stream ber-sesi.**
+3. **Untuk ASM-1 (translasi on-demand)**: translator tidak bisa disuruh
+   menerjemahkan satu pesan acak -- dia butuh header sesinya juga.
+4. **Retensi log**: header sesi HARUS tersimpan selama pesan-pesannya masih
+   ada. Header yang kadaluarsa duluan = seluruh sesi jadi tidak terbaca.
 
 ---
 
