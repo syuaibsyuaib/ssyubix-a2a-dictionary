@@ -2,3 +2,9 @@ __pycache__/
 *.py[cod]
 .pytest_cache/
 .venv/
+
+# jangan pernah commit kredensial
+.env
+.env.*
+*.key
+secrets.json
