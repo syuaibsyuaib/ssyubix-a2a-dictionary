@@ -34,6 +34,15 @@ AILang adalah bahasa terkompresi dirancang khusus untuk komunikasi antar AI syst
 
 ### 2.2 Symbol Substitutions
 
+> ⚠️ **BAGIAN INI TERBANTAH OLEH DATA — JANGAN DIPAKAI TANPA PENGUKURAN ULANG.**
+> Substitusi simbol Unicode di bawah diasumsikan menghemat token, tetapi
+> pengukuran menunjukkan sebaliknya: Pattern B (`Δ`, `°`) menghasilkan 23 token
+> untuk 36 karakter (~1,6 char/token), jauh lebih boros dari rata-rata ~4.
+> Simbol langka pecah menjadi banyak token. Lihat TEMUAN #4 di
+> `CRITICAL_FINDINGS.md`. Arah v0.2 memakai **codebook kata terverifikasi
+> 1-token** (§5.3), bukan simbol.
+
+
 #### Logical Operators
 | Natural | AILang | Use Case |
 |---------|--------|----------|
@@ -165,9 +174,144 @@ fn(x,y)→z      : Function signature
 
 ---
 
-## 5. MESSAGE FORMAT
+## 5. MESSAGE FORMAT (v0.2 — SESSION-SCOPED)
 
-### Standard A2A Message Envelope
+> **REVISI BESAR dari v0.1.** Envelope v0.1 di bawah (dipertahankan sebagai
+> arsip di §5.5) berukuran **3,4x lebih besar** daripada payload yang
+> dibungkusnya — 212 karakter envelope untuk 63 karakter payload. Artinya 77%
+> biaya token ada di metadata, bukan di isi pesan. Memampatkan payload
+> secanggih apa pun tidak akan menembus target ≥60% selama envelope tetap.
+> Lihat TEMUAN #5 di `CRITICAL_FINDINGS.md`.
+>
+> Solusinya: pindahkan semua field konstan ke **state tingkat sesi** yang
+> disepakati sekali lewat handshake, sehingga pesan hanya membawa yang
+> benar-benar berubah.
+
+### 5.1 Dua Fase
+
+```
+FASE 1 — HANDSHAKE   sekali per sesi, verbose, TIDAK dikompresi
+FASE 2 — PESAN       berkali-kali, ramping, hanya delta
+```
+
+Handshake **tidak boleh** dikompresi memakai codebook yang sedang
+dinegosiasikannya sendiri (ayam-telur). Dia polos dan boros — dan itu tidak
+masalah, karena hanya sekali.
+
+### 5.2 Fase 1 — Handshake
+
+**HELLO** (pemrakarsa → lawan bicara):
+
+```json
+{
+  "type": "hello",
+  "proto": "ailang/0.2",
+  "session": "s_7f3a",
+  "from": "agent_a",
+  "to": "agent_b",
+  "codebook": {"id": "core", "version": 3, "hash": "sha256:ab12cd34"},
+  "schema": {"slots": ["act", "obj", "mod"]},
+  "model": "claude-opus-5",
+  "fallback": "natural"
+}
+```
+
+**HELLO_ACK** (menerima):
+
+```json
+{"type":"hello_ack","session":"s_7f3a","codebook_hash":"sha256:ab12cd34"}
+```
+
+**HELLO_NACK** (menolak — WAJIB menyebut kemampuannya sendiri):
+
+```json
+{"type":"hello_nack","session":"s_7f3a","reason":"codebook_version_mismatch",
+ "have":[{"id":"core","version":2,"hash":"sha256:99ff00aa"}],
+ "fallback":"natural"}
+```
+
+#### Kenapa ada `hash`, bukan cuma `version`
+
+Nomor versi bisa sama tapi isinya sudah menyimpang — misalnya satu pihak
+menambal codebook secara lokal tanpa menaikkan versi. `hash` menangkap
+divergensi yang nomor versi lewatkan. **Kedua pihak wajib mencocokkan hash,
+bukan hanya versi.** Ini mitigasi utama RISK-T2 (korupsi diam-diam).
+
+#### Field handshake
+
+| Field | Wajib | Fungsi |
+|---|---|---|
+| `proto` | ya | versi protokol; beda mayor = tolak |
+| `session` | ya | membuat `msg_id` cukup jadi nomor urut pendek |
+| `codebook.id` + `.version` + `.hash` | ya | **paling kritis** — sumber RISK-T2 |
+| `schema.slots` | ya | urutan slot posisi; menghapus kebutuhan kunci `act:`/`obj:` |
+| `model` | ya | properti "1 token" tervalidasi PER MODEL; model beda = kepadatan diam-diam merosot |
+| `from` / `to` | ya | identitas, dipakai sekali lalu implisit |
+| `fallback` | ya | perilaku saat negosiasi gagal |
+
+#### Aturan kegagalan
+
+1. Hash tidak cocok → **TOLAK**, jangan lanjut. Jangan pernah "coba saja dulu".
+2. NACK diterima → turun ke `fallback` (bahasa natural), **jangan gagal total**.
+3. Tidak ada codebook yang sama-sama dimiliki → bahasa natural sepenuhnya.
+4. `proto` beda versi mayor → tolak.
+
+### 5.3 Fase 2 — Format Pesan
+
+Setelah handshake, pesan hanya membawa nomor urut + payload posisional:
+
+```
+7 get user log
+```
+
+- `7` — nomor urut dalam sesi (bukan UUID; sesi sudah diketahui)
+- `get user log` — payload posisional; slot mengikuti `schema.slots`
+  yang disepakati, jadi `get`=act, `user`=obj, `log`=mod
+
+Membalas pesan tertentu memakai `:`
+
+```
+8:7 ok data
+```
+
+= pesan ke-8, membalas pesan ke-7.
+
+Tiap simbol payload adalah entri codebook yang **sudah diverifikasi tepat
+1 token** pada `model` yang disepakati (lihat
+`claude_tools/encoding_bench.py validate-codebook`).
+
+### 5.4 Perbandingan Biaya
+
+| | ~token/pesan | Hemat |
+|---|---|---|
+| v0.1: envelope penuh + payload AILang | 69 | — |
+| v0.2: envelope ramping + codebook | **7** | **~90%** |
+
+Handshake sekitar 30 token dan **impas di pesan pertama** (penghematan
+~53 token/pesan). Rincian titik impas ada di `CRITICAL_FINDINGS.md`.
+
+> ⚠️ Semua angka di atas estimasi `char/4`, **BELUM diukur** dengan endpoint
+> `count_tokens` resmi. Rasionya yang bisa dipegang, bukan digit persisnya.
+
+### 5.5 Konsekuensi ke Log dan Translator
+
+Pemangkasan envelope mengubah sifat log secara mendasar: entri log **tidak
+lagi berdiri sendiri**. `7 get user log` tanpa konteks sesi tidak bermakna
+apa pun.
+
+Karena itu:
+
+1. **Handshake WAJIB ditulis sebagai header sesi di log.**
+2. Translator Agent harus membaca header itu sebelum bisa mendekode satu
+   pesan pun di sesi tersebut.
+3. Log berubah dari kumpulan entri independen menjadi **stream ber-sesi**.
+4. **Retensi**: header sesi harus bertahan selama pesan-pesannya masih ada.
+   Header yang kadaluarsa lebih dulu = seluruh sesi menjadi tidak terbaca.
+
+### 5.6 ARSIP — Envelope v0.1 (JANGAN DIPAKAI)
+
+Dipertahankan sebagai catatan sejarah. 212 karakter, ~53 token per pesan.
+
 ```json
 {
   "v": "0.1",
@@ -183,6 +327,26 @@ fn(x,y)→z      : Function signature
   "efficiency": 0.70
 }
 ```
+
+Ke mana perginya tiap field di v0.2:
+
+| Field v0.1 | Nasib di v0.2 |
+|---|---|
+| `orig_tokens`, `ailang_tokens`, `efficiency` | **dibuang dari kabel** — telemetri, tempatnya di log |
+| `v`, `encoding` | pindah ke handshake (konstan) |
+| `sender`, `receiver` | pindah ke handshake (konstan) |
+| `ts` | dibuang — log sudah punya timestamp sendiri |
+| `msg_id` | jadi nomor urut pendek (sesi sudah diketahui) |
+| `prev_id` | jadi notasi `:n` |
+| `payload` | tetap, tapi jadi posisional |
+
+### 5.7 Prior Art
+
+Pendekatan ini pada dasarnya **HPACK** (kompresi header HTTP/2): tabel
+statis disepakati di muka, tabel dinamis per-koneksi, representasi
+terindeks. Masalahnya identik — header berulang mendominasi payload kecil.
+Sebelum merancang detail lebih jauh, baca penanganan **desinkronisasi
+tabel** di HPACK; itu kegagalan yang sama dengan RISK-T2.
 
 ---
 

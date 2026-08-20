@@ -39,6 +39,20 @@
   - [ ] Beri versi; codebook terikat versi tokenizer
   - Status: BLOCKED — butuh ANTHROPIC_API_KEY
 
+- [x] **[P0]** Envelope ramping + handshake (AILang v0.2 §5)
+  - [x] TEMUAN #5: envelope 3,4x lebih besar dari payload (77% biaya)
+  - [x] Spesifikasi handshake HELLO / HELLO_ACK / HELLO_NACK
+  - [x] Format pesan posisional `7 get user log` + notasi balasan `8:7`
+  - [x] Verifikasi hash codebook (mitigasi RISK-T2 korupsi diam-diam)
+  - [x] Konsekuensi ke format log: header sesi wajib, stream ber-sesi
+  - Status: SELESAI (estimasi char/4; angka final menunggu count_tokens)
+
+- [ ] **[P0]** Bangun codebook transparan posisi-tetap
+  - [ ] Kurasi kandidat kata per slot (act / obj / mod)
+  - [ ] Jalankan `encoding_bench.py validate-codebook` -> saring yang tepat 1 token
+  - [ ] Beri versi + hash; simpan di data/
+  - Status: BLOKIR -- butuh kredensial API
+
 - [ ] **[P0]** AILang Specification v0.1
   - Define core syntax & semantics
   - ~~Document symbol system (→, ↔, ∴, etc)~~ — **DIBATALKAN**: simbol Unicode
